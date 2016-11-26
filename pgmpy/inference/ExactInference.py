@@ -12,13 +12,13 @@ from pgmpy.inference import Inference
 from pgmpy.models import JunctionTree
 from pgmpy.utils import StateNameDecorator
 from collections import defaultdict
+import cPickle
 
 
 class VariableElimination(Inference):
 
     def __init__(self, model):
         super(VariableElimination, self).__init__(model)
-        import cPickle
         self.model_pickled = cPickle.dumps(self.model)
 
     def _barren_nodes(self, model, variables, evidence_vars):
@@ -79,7 +79,6 @@ class VariableElimination(Inference):
         """
         Returns a reduced model structure and
         """
-        import cPickle
         model = cPickle.loads(self.model_pickled)
 
         # Barren Nodes
@@ -101,7 +100,6 @@ class VariableElimination(Inference):
             for var in cpd.variables:
                 factors[var].append(cpd_as_factor)
 
-        import cPickle
         factors = cPickle.loads(cPickle.dumps(factors))
         return factors
 
@@ -146,6 +144,8 @@ class VariableElimination(Inference):
                     factor_reduced = factor.reduce([(evidence_var, evidence[evidence_var])], inplace=False)
                     for var in factor_reduced.scope():
                         working_factors[var].remove(factor)
+                        if factor_reduced in working_factors[var]:
+                            working_factors[var].remove(factor_reduced)
                         working_factors[var].append(factor_reduced)
                 del working_factors[evidence_var]
 
