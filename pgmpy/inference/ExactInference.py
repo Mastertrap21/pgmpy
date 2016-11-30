@@ -133,7 +133,7 @@ class VariableElimination(Inference):
                 all_factors.extend(factor_li)
             return set(all_factors)
 
-        eliminated_variables = set()
+        eliminated_variables = []
         evidence_vars = [evi_var for evi_var, evi_val in evidence.items()] if evidence else []
         working_factors = self._optimize_bayesian_elimination(variables, evidence_vars)
 
@@ -144,8 +144,6 @@ class VariableElimination(Inference):
                     factor_reduced = factor.reduce([(evidence_var, evidence[evidence_var])], inplace=False)
                     for var in factor_reduced.scope():
                         working_factors[var].remove(factor)
-                        if factor_reduced in working_factors[var]:
-                            working_factors[var].remove(factor_reduced)
                         working_factors[var].append(factor_reduced)
                 del working_factors[evidence_var]
 
@@ -170,18 +168,19 @@ class VariableElimination(Inference):
                 phi = factor_product(*factors)
                 phi = getattr(phi, operation)([var], inplace=False)
                 for variable in phi.variables:
-                    if phi in working_factors[variable]:
-                        working_factors[variable].remove(phi)
                     working_factors[variable].append(phi)
-            eliminated_variables.add(var)
+            eliminated_variables.append(var)
 
         final_distribution = []
         for node in working_factors:
             factors = working_factors[node]
             for factor in factors:
-                if not set(factor.variables).intersection(eliminated_variables):
-                    if factor in final_distribution:
-                        final_distribution.remove(factor)
+                eliminated = False
+                for variable in factor.variables:
+                    if variable in eliminated_variables:
+                        eliminated = True
+                        break
+                if not eliminated:
                     final_distribution.append(factor)
 
         query_var_factor = {}
