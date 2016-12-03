@@ -12,6 +12,7 @@ from pgmpy.inference import Inference
 from pgmpy.models import JunctionTree
 from pgmpy.utils import StateNameDecorator
 from collections import defaultdict
+from pgmpy.models import BayesianModel
 import cPickle
 
 
@@ -19,7 +20,8 @@ class VariableElimination(Inference):
 
     def __init__(self, model):
         super(VariableElimination, self).__init__(model)
-        self.model_pickled = cPickle.dumps(self.model)
+        if isinstance(self.model, BayesianModel):
+            self.model_pickled = cPickle.dumps(self.model)
 
     def _barren_nodes(self, model, variables, evidence_vars):
         """
@@ -135,7 +137,13 @@ class VariableElimination(Inference):
 
         eliminated_variables = []
         evidence_vars = [evi_var for evi_var, evi_val in evidence.items()] if evidence else []
-        working_factors = self._optimize_bayesian_elimination(variables, evidence_vars)
+        working_factors = defaultdict(list)
+        for node in self.factors:
+            for factor in self.factors[node]:
+                working_factors[node].append(factor)
+        self.workingfactors = cPickle.loads(cPickle.dumps(working_factors))
+        if isinstance(self.model, BayesianModel) and operation == "marginalize":
+            working_factors = self._optimize_bayesian_elimination(variables, evidence_vars)
 
         # Dealing with evidence. Reducing factors over it before VE is run.
         if evidence:
@@ -417,6 +425,8 @@ class BeliefPropagation(Inference):
     """
 
     def __init__(self, model):
+        from pgmpy.models import JunctionTree
+
         super(BeliefPropagation, self).__init__(model)
 
         if not isinstance(model, JunctionTree):
