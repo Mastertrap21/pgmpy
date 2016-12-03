@@ -29,8 +29,16 @@ class DiscreteFactor(BaseFactor):
     reduce([variable_values_list])
     """
 
+    current_id = 0
+    id = 0
+    @staticmethod
+    def get_next_id():
+        DiscreteFactor.current_id += 1
+        return DiscreteFactor.current_id
+
     @StateNameInit()
     def __init__(self, variables, cardinality, values):
+        self.id = DiscreteFactor.get_next_id()
         """
         Initialize a factor class.
 
@@ -778,6 +786,9 @@ class DiscreteFactor(BaseFactor):
             return False
 
         elif set(self.scope()) != set(other.scope()):
+            return False
+
+        elif self.id != other.id:
             return False
 
         else:
