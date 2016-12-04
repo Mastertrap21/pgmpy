@@ -16,6 +16,14 @@ from pgmpy.models import BayesianModel
 import cPickle
 
 
+def is_in_list(element, container):
+    found = False
+    for the_element in container:
+        if the_element.id == element.id:
+            found = True
+            break
+    return found
+
 class VariableElimination(Inference):
 
     def __init__(self, model):
@@ -137,13 +145,15 @@ class VariableElimination(Inference):
 
         eliminated_variables = []
         evidence_vars = [evi_var for evi_var, evi_val in evidence.items()] if evidence else []
-        working_factors = defaultdict(list)
-        for node in self.factors:
-            for factor in self.factors[node]:
-                working_factors[node].append(factor)
-        self.workingfactors = cPickle.loads(cPickle.dumps(working_factors))
+
         if isinstance(self.model, BayesianModel) and operation == "marginalize":
             working_factors = self._optimize_bayesian_elimination(variables, evidence_vars)
+        else:
+            working_factors = defaultdict(list)
+            for node in self.factors:
+                for factor in self.factors[node]:
+                    working_factors[node].append(factor)
+            self.workingfactors = cPickle.loads(cPickle.dumps(working_factors))
 
         # Dealing with evidence. Reducing factors over it before VE is run.
         if evidence:
@@ -152,7 +162,7 @@ class VariableElimination(Inference):
                     factor_reduced = factor.reduce([(evidence_var, evidence[evidence_var])], inplace=False)
                     for var in factor_reduced.scope():
                         working_factors[var].remove(factor)
-                        if factor_reduced in working_factors[var]:
+                        if is_in_list(factor_reduced, working_factors[var]):
                             working_factors[var].remove(factor_reduced)
                         working_factors[var].append(factor_reduced)
                 del working_factors[evidence_var]
@@ -178,9 +188,10 @@ class VariableElimination(Inference):
                 phi = factor_product(*factors)
                 phi = getattr(phi, operation)([var], inplace=False)
                 for variable in phi.variables:
-                    if phi in working_factors[variable]:
-                        working_factors[variable].remove(phi)
-                    working_factors[variable].append(phi)
+                    if not np.any(phi.values == 1):
+                        if is_in_list(phi, working_factors[variable]):
+                            working_factors[variable].remove(phi)
+                        working_factors[variable].append(phi)
             eliminated_variables.append(var)
 
         final_distribution = []
@@ -193,7 +204,7 @@ class VariableElimination(Inference):
                         eliminated = True
                         break
                 if not eliminated:
-                    if factor in final_distribution:
+                    if is_in_list(factor, final_distribution):
                         final_distribution.remove(factor)
                     final_distribution.append(factor)
 
@@ -437,6 +448,11 @@ class BeliefPropagation(Inference):
         self.clique_beliefs = {}
         self.sepset_beliefs = {}
 
+        is_calibrated = self._is_converged(operation='marginalize')
+        # Calibrate the junction tree if not calibrated
+        if not is_calibrated:
+            self.calibrate()
+
     def get_cliques(self):
         """
         Returns cliques used for belief propagation.
@@ -662,12 +678,6 @@ class BeliefPropagation(Inference):
         Algorithm 10.4 Out-of-clique inference in clique tree
         Probabilistic Graphical Models: Principles and Techniques Daphne Koller and Nir Friedman.
         """
-
-        is_calibrated = self._is_converged(operation=operation)
-        # Calibrate the junction tree if not calibrated
-        if not is_calibrated:
-            self.calibrate()
-
         if not isinstance(variables, (list, tuple, set)):
             query_variables = [variables]
         else:

@@ -788,9 +788,6 @@ class DiscreteFactor(BaseFactor):
         elif set(self.scope()) != set(other.scope()):
             return False
 
-        elif self.id != other.id:
-            return False
-
         else:
             phi = other.copy()
             for axis in range(self.values.ndim):
