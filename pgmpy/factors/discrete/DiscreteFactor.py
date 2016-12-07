@@ -235,6 +235,9 @@ class DiscreteFactor(BaseFactor):
         """
         return DiscreteFactor(self.variables, self.cardinality, np.ones(self.values.size))
 
+    def null_factor(self):
+        return DiscreteFactor(self.variables, self.cardinality, np.zeros(self.values.size))
+
     def marginalize(self, variables, inplace=True):
         """
         Modifies the factor with marginalized values.
@@ -384,6 +387,22 @@ class DiscreteFactor(BaseFactor):
         phi = self if inplace else self.copy()
 
         phi.values = phi.values / phi.values.sum()
+
+        if not inplace:
+            return phi
+
+    @StateNameDecorator(argument='values', return_val=None)
+    def add_evidence(self, values, inplace=True):
+        phi = self if inplace else self.copy()
+
+        slice_ = [slice(None)] * len(self.variables)
+        for var, state in values:
+            var_index = phi.variables.index(var)
+            slice_[var_index] = state
+
+        identity_phi = phi.null_factor()
+        identity_phi.values[tuple(slice_)] = 1
+        phi.product(identity_phi)
 
         if not inplace:
             return phi
